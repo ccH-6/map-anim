@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>地图图块拖拽+缩放布局器（含宽高导出）</title>
+  <style>
+    body { margin:0; font-family:sans-serif; }
+    #canvas {
+      position:relative;
+      width:1200px; 
+      height:1400px;
+      background:#fff; 
+      border:1px solid #ccc;
+      margin:20px auto;
+      overflow:hidden;
+    }
+    #canvas img {
+      position:absolute;
+      width:300px;      /* 初始宽度，可根据需要调整 */
+      height:auto;
+      cursor:move;
+      user-select:none;
+      transform-origin: top left;
+      outline: none;
+      transition: outline .2s;
+    }
+    #canvas img.selected {
+      outline: 3px solid red;
+    }
+    #toolbar {
+      text-align:center;
+      margin:10px;
+    }
+    #toolbar > * { margin:0 5px; vertical-align:middle; }
+    #coords {
+      display:block;
+      width:90%;
+      height:140px;
+      margin:10px auto;
+      font-family:monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toolbar">
+    <button id="export">导出坐标+尺寸 JSON</button>
+    <label>缩放：
+      <input id="scale" type="range" min="0.2" max="2" step="0.01" value="1">
+    </label>
+  </div>
+
+  <div id="canvas">
+    <img id="jiaozuo"      src="images/jiaozuo.png"      alt="焦作">
+    <img id="xinxiang"     src="images/xinxiang.png"     alt="新乡">
+    <img id="kaifeng"      src="images/kaifeng.png"      alt="开封">
+    <img id="luoyang"      src="images/luoyang.png"      alt="洛阳">
+    <img id="zhengzhou"    src="images/zhengzhou.png"    alt="郑州">
+    <img id="xuchang"      src="images/xuchang.png"      alt="许昌">
+    <img id="pingdingshan" src="images/pingdingshan.png" alt="平顶山">
+    <img id="luohe"        src="images/luohe.png"        alt="漯河">
+  </div>
+
+  <textarea id="coords" readonly placeholder="坐标、缩放、宽高将在这里显示…"></textarea>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const imgs = canvas.querySelectorAll('img');
+    let selectedEl = null;
+
+    // 初始化位置和缩放
+    imgs.forEach(el => {
+      el.style.left = '0px';
+      el.style.top  = '0px';
+      el.style.transform = 'scale(1)';
+    });
+
+    // 点击选中
+    imgs.forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        imgs.forEach(i => i.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedEl = el;
+        // 同步滑块
+        const style = window.getComputedStyle(el);
+        const m = style.transform.match(/matrix\(([^,]+),/);
+        document.getElementById('scale').value = m ? parseFloat(m[1]) : 1;
+      });
+    });
+
+    // 画布点击取消选中
+    canvas.addEventListener('click', () => {
+      imgs.forEach(i => i.classList.remove('selected'));
+      selectedEl = null;
+    });
+
+    // 缩放滑块
+    document.getElementById('scale').addEventListener('input', e => {
+      if (!selectedEl) return;
+      selectedEl.style.transform = `scale(${e.target.value})`;
+    });
+
+    // 拖拽
+    imgs.forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const startX = e.clientX, startY = e.clientY;
+        const rect = el.getBoundingClientRect();
+        const dx = startX - rect.left, dy = startY - rect.top;
+        function onmove(ev) {
+          const cRect = canvas.getBoundingClientRect();
+          el.style.left = (ev.clientX - dx - cRect.left) + 'px';
+          el.style.top  = (ev.clientY - dy - cRect.top)  + 'px';
+        }
+        function onup() {
+          window.removeEventListener('mousemove', onmove);
+          window.removeEventListener('mouseup', onup);
+        }
+        window.addEventListener('mousemove', onmove);
+        window.addEventListener('mouseup', onup);
+      });
+    });
+
+    // 导出坐标+缩放+宽高
+    document.getElementById('export').onclick = () => {
+      const data = {};
+      imgs.forEach(el => {
+        const x = parseInt(el.style.left, 10);
+        const y = parseInt(el.style.top, 10);
+        const style = window.getComputedStyle(el);
+        const m = style.transform.match(/matrix\(([^,]+),/);
+        const scale = m ? parseFloat(m[1]) : 1;
+        const { width, height } = el.getBoundingClientRect();
+        data[el.id] = {
+          x, y,
+          scale,
+          width: Math.round(width),
+          height: Math.round(height)
+        };
+      });
+      document.getElementById('coords').value = JSON.stringify(data, null, 2);
+    };
+  </script>
+
+</body>
+</html>
